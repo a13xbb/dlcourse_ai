@@ -14,8 +14,12 @@ def softmax(predictions):
         probability for every class, 0..1
     '''
     # TODO implement softmax
+    preds = predictions.copy()
+    preds -= np.max(preds, axis=-1)[..., None]
+    denominator = np.sum(np.exp(preds), axis=-1)[..., None]
+    sm = np.exp(preds) / denominator
     # Your final implementation shouldn't have any loops
-    raise Exception("Not implemented!")
+    return sm
 
 
 def cross_entropy_loss(probs, target_index):
@@ -32,8 +36,14 @@ def cross_entropy_loss(probs, target_index):
       loss: single value
     '''
     # TODO implement cross-entropy
+    loss = 0
+    if type(target_index) is int:
+      loss = -np.log(probs[target_index])
+    else:
+      for i, sample in enumerate(probs):
+        loss -= np.log(sample[target_index[i]])
     # Your final implementation shouldn't have any loops
-    raise Exception("Not implemented!")
+    return loss
 
 
 def softmax_with_cross_entropy(predictions, target_index):
@@ -52,8 +62,16 @@ def softmax_with_cross_entropy(predictions, target_index):
       dprediction, np array same shape as predictions - gradient of predictions by loss value
     '''
     # TODO implement softmax with cross-entropy
-    # Your final implementation shouldn't have any loops
-    raise Exception("Not implemented!")
+    probs = softmax(predictions)
+    loss = cross_entropy_loss(probs, target_index)
+    
+    dprediction = probs.copy()
+    
+    if type(target_index) is int:
+      dprediction[target_index] = probs[target_index] - 1
+    else:
+      for i in range(len(predictions)):
+        dprediction[i][target_index[i]] = probs[i][target_index[i]] - 1
 
     return loss, dprediction
 
@@ -72,8 +90,8 @@ def l2_regularization(W, reg_strength):
     '''
 
     # TODO: implement l2 regularization and gradient
-    # Your final implementation shouldn't have any loops
-    raise Exception("Not implemented!")
+    loss = reg_strength * np.sum(W**2)
+    grad = 2 * reg_strength * W 
 
     return loss, grad
     
@@ -93,10 +111,10 @@ def linear_softmax(X, W, target_index):
 
     '''
     predictions = np.dot(X, W)
-
+    dW = np.zeros_like(W)
     # TODO implement prediction and gradient over W
-    # Your final implementation shouldn't have any loops
-    raise Exception("Not implemented!")
+    loss, dprediction = softmax_with_cross_entropy(predictions, target_index)
+    dW = np.dot(X.T, dprediction)
     
     return loss, dW
 
@@ -133,14 +151,25 @@ class LinearSoftmaxClassifier():
             batches_indices = np.array_split(shuffled_indices, sections)
 
             # TODO implement generating batches from indices
+            batches = []
+            for batch_indices in batches_indices:
+              batches.append((X[batch_indices], y[batch_indices]))
+            
+            loss = 0
+            for X_batch, y_batch in batches:
+              ce_loss, dw_grad = linear_softmax(X_batch, self.W, y_batch)
+              l2_loss, l2_grad = l2_regularization(self.W, reg)
+              loss += ce_loss + l2_loss
+              self.W -= learning_rate * (dw_grad + l2_grad)
+              
             # Compute loss and gradients
             # Apply gradient to weights using learning rate
             # Don't forget to add both cross-entropy loss
             # and regularization!
-            raise Exception("Not implemented!")
-
+            loss_history.append(loss / batch_size)
             # end
-            print("Epoch %i, loss: %f" % (epoch, loss))
+            if (epoch + 1) % 10 == 0:
+              print("Epoch %i, loss: %f" % (epoch + 1, loss / batch_size))
 
         return loss_history
 
@@ -154,12 +183,12 @@ class LinearSoftmaxClassifier():
         Returns:
           y_pred, np.array of int (test_samples)
         '''
-        y_pred = np.zeros(X.shape[0], dtype=np.int)
+        y_pred = np.zeros(X.shape[0], dtype=int)
 
         # TODO Implement class prediction
+        y_preds_raw = np.dot(X, self.W)
+        y_pred = np.argmax(y_preds_raw, axis=1)
         # Your final implementation shouldn't have any loops
-        raise Exception("Not implemented!")
-
         return y_pred
 
 
